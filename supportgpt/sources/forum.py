@@ -18,3 +18,12 @@ class ForumSource:
         "Returns a list of categories"
         return self._fetch('/categories.json')['category_list']['categories']
 
+    def fetch_topics(self, category_slug, category_id):
+        "Returns topics for a category"
+        return self._fetch(f"/c/{category_slug}/{category_id}.json")['topic_list']['topics']
+
+    def fetch_posts(self, topic_id):
+        "Returns posts for a topic"
+        return self._fetch(f"/t/{topic_id}/posts.json")['post_stream']['posts']
+
+
