@@ -20,7 +20,11 @@ def test_topics():
     assert "I think this bug" in [top['title'] for top in topics]
 
 def test_topics_iterator():
-    assert "Error: Multi-threaded server is not available on Windows. Falling back to single thread" in [top['title'] for top in src._topics('Support')]
+    title = "Error: Multi-threaded server is not available on Windows. Falling back to single thread"
+    assert title in [top['title'] for top in src._topics_raw('Support')]
+
+def test_solved_topics():
+    assert any("I think this bug" in topic for topic in src._solved_topics('Support'))
 
 def test_posts():
     support  = { cat['name']: cat for cat in src._fetch_categories() }['Support']

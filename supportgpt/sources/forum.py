@@ -1,8 +1,23 @@
 import requests
 from urllib.parse import urljoin
+import jinja2
+
+jinja_env = jinja2.Environment()
 
 
 class ForumSource:
+    TOPIC_TEMPLATE = jinja_env.from_string("""\
+# {{ topic.title }}
+{% for post in topic.posts %}
+## Message from {{ post.author }}
+
+```html
+{{ post.content }}
+```
+{{ post.image_content }}
+{% endfor %}
+""")
+
     def __init__(self, api_key, api_username, base_url='https://forum.subspace.network'):
         self.api_key = api_key
         self.api_username = api_username
@@ -26,8 +41,8 @@ class ForumSource:
         "Returns posts for a topic"
         return self._fetch(f"/t/{topic_id}/posts.json")['post_stream']['posts']
 
-    def _topics(self, category_name):
-        "Returns iterator over topics in category"
+    def _topics_raw(self, category_name):
+        "Returns iterator over raw topics in category"
         cat = { cat['name']: cat for cat in self._fetch_categories() }[category_name]
         page = 0
         while True:
@@ -38,4 +53,30 @@ class ForumSource:
             for t in topics:
                 yield t
 
+    def _format_topic(self, topic_title, topic_id):
+        "Returns markdown formatted topic"
+
+        return self.TOPIC_TEMPLATE.render(topic={
+            "title": topic_title,
+            "posts": [
+                {
+                    "author": post["username"],
+                    "content": post["cooked"],
+                    # TODO: fetch image content
+                    "image_content": "",
+                }
+                for post in self._fetch_posts(topic_id)
+            ]
+        })
+
+
+
+    def _solved_topics(self, category_name):
+        "Creates document from each solved topic in category"
+
+        for topic in self._topics_raw(category_name):
+            if not topic['has_accepted_answer']:
+                continue
+
+            yield self._format_topic(topic['title'], topic['id'])
 
