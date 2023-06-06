@@ -1,8 +1,39 @@
 import requests
-from urllib.parse import urljoin
 import jinja2
+import cv2
+import numpy as np
+
+from urllib.parse import urljoin
+from pytesseract import image_to_string
+
 
 jinja_env = jinja2.Environment()
+
+
+def is_url_image(url):
+    response = requests.head(url)
+    response.raise_for_status()
+    content_type = response.headers.get('Content-Type', '').lower()
+    return content_type.startswith('image/')
+
+def url_image_to_text(url):
+    if not is_url_image(url):
+        return None
+
+    # Download the image
+    response = requests.get(url)
+    if response.status_code != 200:
+        return None
+
+    # Convert the image data to OpenCV format
+    image_data = np.frombuffer(response.content, dtype=np.uint8)
+    img = cv2.imdecode(image_data, flags=cv2.IMREAD_COLOR)
+
+    # Convert the image to grayscale
+    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Apply OCR
+    return image_to_string(gray_img)
 
 
 class ForumSource:
@@ -14,7 +45,14 @@ class ForumSource:
 ```html
 {{ post.content }}
 ```
-{{ post.image_content }}
+
+Image content:
+```
+{% for image in post.images %}
+{{ image }}
+{% endfor %}
+```
+
 {% endfor %}
 """)
 
@@ -56,18 +94,26 @@ class ForumSource:
     def _format_topic(self, topic_title, topic_id):
         "Returns markdown formatted topic"
 
-        return self.TOPIC_TEMPLATE.render(topic={
-            "title": topic_title,
-            "posts": [
-                {
-                    "author": post["username"],
-                    "content": post["cooked"],
-                    # TODO: fetch image content
-                    "image_content": "",
-                }
-                for post in self._fetch_posts(topic_id)
-            ]
-        })
+        posts = []
+
+        for post in self._fetch_posts(topic_id):
+            images = []
+
+            if "link_counts" in post:
+                for link in post["link_counts"]:
+                    if link["url"].startswith("http"):
+                        images.append(url_image_to_text(link["url"]))
+
+            if "image_url" in post:
+                images.append(url_image_to_text(post["image_url"]))
+
+            posts.append({
+                "author": post["username"],
+                "content": post["cooked"],
+                "images": images,
+            })
+
+        return self.TOPIC_TEMPLATE.render(topic={ "title": topic_title, "posts": posts })
 
 
 

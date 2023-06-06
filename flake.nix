@@ -29,6 +29,7 @@
           '';
 
           packages = with pkgs; [
+            tesseract
             poetry
             stdenv.cc.cc.lib
             zlib
