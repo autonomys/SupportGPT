@@ -91,6 +91,10 @@ Attached images content:
         "Returns topics for a category"
         return self._fetch(f"/c/{category_slug}/{category_id}.json", params={ "page": page })['topic_list']['topics']
 
+    def _fetch_topic(self, topic_id):
+        "Returns topic"
+        return self._fetch(f"/t/{topic_id}.json")
+
     def _fetch_posts(self, topic_id):
         "Returns posts for a topic"
         return self._fetch(f"/t/{topic_id}/posts.json")['post_stream']['posts']
@@ -153,9 +157,9 @@ Attached images content:
         template="""\
 Identify user's problem and solution to it from forum thread. Be precise. Output result in json.
 
-"{text}"
-
------
+------------
+{text}
+------------
 
 PROBLEM AND SOLUTION:""",
         input_variables=["text"],
@@ -173,29 +177,25 @@ If the context isn't useful, return the original problem and solution.""",
         input_variables=["existing_answer", "text"],
     )
 
+    def _summarize_topic(self, topic):
+        "Summarizes a topic to object like {'problem':..., 'solution':...}"
+
+        if getattr(self, 'llm', None) is None:
+            self.chain = load_summarize_chain(
+                OpenAI(temperature=0, api_key=self.openai_api_key),
+                chain_type="refine",
+                question_prompt=self.QUESTION_PROMPT,
+                refine_prompt=self.REFINE_PROMPT,
+                verbose=self.verbose,
+            )
+            self.text_splitter = CharacterTextSplitter()
+
+        fmt = self._format_topic(topic['title'], topic['id'])
+        docs = [Document(page_content=t) for t in self.text_splitter.split_text(fmt)]
+        return json.loads(self.chain.run(docs))
+
     def summarize_topics(self, category_name):
-        "Returns iterator over summarized topics"
-
-        llm = OpenAI(temperature=0, api_key=self.openai_api_key)
-
-        chain = load_summarize_chain(
-            llm,
-            chain_type="refine",
-            question_prompt=self.QUESTION_PROMPT,
-            refine_prompt=self.REFINE_PROMPT,
-            verbose=self.verbose,
-        )
-        text_splitter = CharacterTextSplitter()
-
         for topic in self._topics_raw(category_name):
             if not topic['has_accepted_answer']:
                 continue
-
-            texts = text_splitter.split_text(self._format_topic(topic['title'], topic['id']))
-            docs = [Document(page_content=t) for t in texts]
-            result = json.loads(chain.run(docs))
-            yield {
-                "topic": topic,
-                "problem": result["problem"],
-                "solution": result["solution"],
-            }
+            yield self._summarize_topic(topic)
