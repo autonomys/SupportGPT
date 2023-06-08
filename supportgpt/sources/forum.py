@@ -5,6 +5,12 @@ import numpy as np
 
 from urllib.parse import urljoin
 from pytesseract import image_to_string
+from langchain import OpenAI, PromptTemplate, LLMChain
+from langchain.chains.mapreduce import MapReduceChain
+from langchain.chains.summarize import load_summarize_chain
+from langchain.docstore.document import Document
+from langchain.prompts import PromptTemplate
+from langchain.text_splitter import CharacterTextSplitter
 
 
 jinja_env = jinja2.Environment()
@@ -56,10 +62,19 @@ Image content:
 {% endfor %}
 """)
 
-    def __init__(self, api_key, api_username, base_url='https://forum.subspace.network'):
+    def __init__(
+        self,
+        api_key,
+        api_username,
+        openai_api_key=None,
+        base_url='https://forum.subspace.network',
+        verbose=True,
+    ):
         self.api_key = api_key
+        self.openai_api_key = openai_api_key
         self.api_username = api_username
         self.base_url = base_url
+        self.verbose = verbose
 
     def _fetch(self, url, params=None):
         headers = { 'Api-Key': self.api_key, 'Api-Username': self.api_username }
@@ -115,8 +130,6 @@ Image content:
 
         return self.TOPIC_TEMPLATE.render(topic={ "title": topic_title, "posts": posts })
 
-
-
     def _solved_topics(self, category_name):
         "Creates document from each solved topic in category"
 
@@ -126,3 +139,14 @@ Image content:
 
             yield self._format_topic(topic['title'], topic['id'])
 
+    def summarize_topics(self, category_name):
+        "Returns iterator over summarized topics"
+
+        llm = OpenAI(temperature=0, api_key=self.openai_api_key)
+        chain = load_summarize_chain(llm, chain_type="refine", verbose=self.verbose)
+        text_splitter = CharacterTextSplitter()
+
+        for topic in self._solved_topics(category_name):
+            texts = text_splitter.split_text(topic)
+            docs = [Document(page_content=t) for t in texts]
+            yield chain.run(docs)
