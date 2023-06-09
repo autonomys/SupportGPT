@@ -6,7 +6,11 @@ from os import getenv
 
 load_dotenv()
 
-src = ForumSource(getenv('FORUMS_API_KEY'), getenv('FORUMS_API_USERNAME'))
+src = ForumSource(
+    getenv('FORUMS_API_KEY'),
+    getenv('FORUMS_API_USERNAME'),
+    openai_api_key=getenv('OPENAI_API_KEY')
+)
 
 
 def test_categories():
