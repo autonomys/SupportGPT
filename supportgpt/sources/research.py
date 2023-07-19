@@ -11,82 +11,88 @@ import openai
 from dotenv import load_dotenv
 from os import getenv
 
-load_dotenv()
-
-#openai.api_key_path = getenv('OPENAI_API_KEY')
 
 
-#constructor
-#  def __init__(
-#         self,
-#         api_key,
-#         api_username,
-#         openai_api_key=None,
-#         base_url='https://forum.subspace.network',
-#         verbose=True,
-#     ):
 
-#load PDF
-# PDFReader = download_loader("PDFReader")
-# loader = PDFReader()
-# docs = loader.load_data(file=Path('../../data/whitepaper.pdf'))
+def query_research(message):
+    load_dotenv()
 
-docs = SimpleDirectoryReader('data').load_data()
-#parse PDF
-parser = SimpleNodeParser()
-nodes = parser.get_nodes_from_documents(docs)
+    #openai.api_key_path = getenv('OPENAI_API_KEY')
 
-# initialize connection to pinecone
-# pinecone.init(
-#     getenv('PINECONE_API_KEY'),
-#     getenv('PINECONE_ENVIRONMENT'),
-# )
 
-pinecone.init(
-    api_key=os.environ['PINECONE_API_KEY'],
-              environment=os.environ['PINECONE_ENVIRONMENT']
-)
+    #constructor
+    #  def __init__(
+    #         self,
+    #         api_key,
+    #         api_username,
+    #         openai_api_key=None,
+    #         base_url='https://forum.subspace.network',
+    #         verbose=True,
+    #     ):
 
-# create the index if it does not exist already
-index_name = 'research-test'
-if index_name not in pinecone.list_indexes():
-    pinecone.create_index(
-        index_name,
-        dimension=1536,
-        metric='cosine'
+    #load PDF
+    # PDFReader = download_loader("PDFReader")
+    # loader = PDFReader()
+    # docs = loader.load_data(file=Path('../../data/whitepaper.pdf'))
+
+    docs = SimpleDirectoryReader('/Users/ryanyeung/Code/Crypto/SupportGPT/supportgpt/sources/data').load_data()
+    #parse PDF
+    parser = SimpleNodeParser()
+    nodes = parser.get_nodes_from_documents(docs)
+
+    # initialize connection to pinecone
+    # pinecone.init(
+    #     getenv('PINECONE_API_KEY'),
+    #     getenv('PINECONE_ENVIRONMENT'),
+    # )
+
+    pinecone.init(
+        api_key=os.environ['PINECONE_API_KEY'],
+                environment=os.environ['PINECONE_ENVIRONMENT']
     )
 
-# connect to the index
-pinecone_index = pinecone.Index(index_name)
-    
+    # create the index if it does not exist already
+    index_name = 'research-test'
+    if index_name not in pinecone.list_indexes():
+        pinecone.create_index(
+            index_name,
+            dimension=1536,
+            metric='cosine'
+        )
 
-# we can select a namespace (acts as a partition in an index)
-namespace = '' # default namespace
-vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
+    # connect to the index
+    pinecone_index = pinecone.Index(index_name)
+        
 
-
-# setup our storage (vector db)
-storage_context = StorageContext.from_defaults(
-    vector_store=vector_store
-)
-# setup the index/query process, ie the embedding model (and completion if used)
-embed_model = OpenAIEmbedding(model='text-embedding-ada-002', embed_batch_size=100)
-service_context = ServiceContext.from_defaults(embed_model=embed_model)
-
-index = GPTVectorStoreIndex.from_documents(
-    docs, storage_context=storage_context,
-    service_context=service_context
-)
-
-# retriever = index.as_retriever(retriever_mode='default')
-# query_engine = RetrieverQueryEngine(retriever)
-# #query_engine = RetrieverQueryEngine.from_args(retriever, response_mode='default')
-
-query_engine = index.as_query_engine()
-res = query_engine.query("What is the farmer's dilemna?")
+    # we can select a namespace (acts as a partition in an index)
+    namespace = '' # default namespace
+    vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
 
 
-print(str(res))
-print(res.get_formatted_sources())
+    # setup our storage (vector db)
+    storage_context = StorageContext.from_defaults(
+        vector_store=vector_store
+    )
+    # setup the index/query process, ie the embedding model (and completion if used)
+    embed_model = OpenAIEmbedding(model='text-embedding-ada-002', embed_batch_size=100)
+    service_context = ServiceContext.from_defaults(embed_model=embed_model)
 
-#pinecone.delete_index(index_name)
+    index = GPTVectorStoreIndex.from_documents(
+        docs, storage_context=storage_context,
+        service_context=service_context
+    )
+
+    # retriever = index.as_retriever(retriever_mode='default')
+    # query_engine = RetrieverQueryEngine(retriever)
+    # #query_engine = RetrieverQueryEngine.from_args(retriever, response_mode='default')
+
+    query_engine = index.as_query_engine()
+    res = query_engine.query(message)
+
+    return str(res)
+
+
+    # print(str(res))
+    # print(res.get_formatted_sources())
+
+    #pinecone.delete_index(index_name)
